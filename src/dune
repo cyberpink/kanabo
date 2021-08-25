@@ -1,0 +1,5 @@
+(library
+  (name kanabo)
+  (public_name kanabo)
+  (modules amt array SVec mergeable bits ratio monoid group ring field coercible math store)
+  (foreign_stubs (language c) (names stub)))

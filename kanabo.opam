@@ -1,0 +1,12 @@
+opam-version: "2.0"
+name: "kanabo"
+version: "0.1"
+maintainer: "no"
+synopsis: "Util libraries"
+authors: ["cyberpink"]
+homepage: "no"
+bug-reports: "no"
+license: "Apache-2.0"
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
