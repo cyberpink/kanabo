@@ -1,9 +1,9 @@
 module type storage = sig
   type 'a t
-  (* type key = int *)
   val find_opt : int -> 'a t -> 'a option 
   val empty : 'a t
   val add : int -> 'a -> 'a t -> 'a t
+  val update : int -> ('a option -> 'a option) -> 'a t -> 'a t
 end
 
 module Make(Storage : storage) () = struct
@@ -35,4 +35,8 @@ module Make(Storage : storage) () = struct
   let set (Key key) value store =
     { store with storage = Storage.add key value store.storage }
 
+  let update (Key key) fn default store =
+    let update = function None -> fn (Lazy.force default) | Some x -> fn x in
+    { store with storage = Storage.update key update store.storage }
+    
 end
