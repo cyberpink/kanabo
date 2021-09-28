@@ -16,9 +16,9 @@ let random_inserts (module M : Amt.S with type key = int) iters =
     let v = Option.get @@ M.find_opt key !map in
     let expected = values.(i) in
     if expected <> v then
-      Printf.printf "random insert check failed map[%d] %d <> %d\n" i expected v
+      Printf.printf "random check failed map[%d] %d <> %d\n" i expected v
   done;
-  Printf.printf "%d random insert check successful\n" iters
+  Printf.printf "%d random inserts successful\n" iters
 
 let test_union (module M : Amt.S with type key = int) rand_range =
   let _ = Random.int 2 in

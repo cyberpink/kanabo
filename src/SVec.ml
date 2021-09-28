@@ -69,6 +69,6 @@ let merge map_a map_b merge_ab a b =
 
 include Mergeable.MergeSet(struct
     type key = int
-    type 'a s = 'a t
+    type nonrec 'a t = 'a t
     let merge = merge
   end)

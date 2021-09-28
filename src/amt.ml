@@ -28,7 +28,7 @@ sig
   val min_binding_opt : 'a t -> (key * 'a) option
 end
 
-module AMT : S = struct
+module AMT : (S with type key = int) = struct
   module Key = struct
     type t = int
     let empty = (0, 0)
@@ -103,7 +103,7 @@ module AMT : S = struct
 
   include Mergeable.MergeSet(struct
       type key = Key.t
-      type 'a s = 'a t
+      type nonrec 'a t = 'a t
       let merge = merge
     end)
 
