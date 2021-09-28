@@ -35,8 +35,7 @@ module Make(Storage : storage) () = struct
   let set (Key key) value store =
     { store with storage = Storage.add key value store.storage }
 
-  let update (Key key) fn default store =
-    let update = function None -> fn (Lazy.force default) | Some x -> fn x in
-    { store with storage = Storage.update key update store.storage }
+  let update (Key key) fn store =
+    { store with storage = Storage.update key fn store.storage }
     
 end
