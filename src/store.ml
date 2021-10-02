@@ -25,7 +25,7 @@ module Make(Storage : storage) () = struct
   let get (Key key) store =
     match Storage.find_opt key store.storage with
     | None -> None
-    | Some v -> Some (v, store)
+    | Some v -> Some v
                   
   let get_exn key store =
     match get key store with
