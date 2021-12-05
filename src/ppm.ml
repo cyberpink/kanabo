@@ -1,37 +1,32 @@
-type t = { width : int; height : int; depth : int; buffer : Bytes.t }
+type 'a pixel = 'a * 'a * 'a
+                
+type t = {
+  width : int;
+  height : int;
+  max_val : int;
+  format : (module Bytes_view.S);
+  buffer : Bytes.t
+}
 
 let copy p = { p with buffer = Bytes.copy p.buffer }
-
-let make width height depth =
-  let buffer = Bytes.create (width * height * depth * 3) in
-  { width; height; depth; buffer }
-
 let width p = p.width
 let height p = p.height                   
 
-let get_pixel p x y =
-  let get =
-    match p.depth with
-    | 1 -> Bytes.get_uint8
-    | 2 -> Bytes.get_uint16_be
-    | _ -> raise @@ Invalid_argument "bad depth"
-  in
-  let pixel = (p.width * y) + x in
-  let get_channel c = get p.buffer (pixel + c) in
-  (get_channel 0, get_channel 1, get_channel 2)
+let get_pixel (p : t) x y =
+  let module P = (val p.format) in
+  let pixel = ((p.width * y) + x) * 3 in
+  let buf = P.of_bytes p.buffer in
+  P.(get buf (pixel + 0),
+     get buf (pixel + 1),
+     get buf (pixel + 2))
 
-let set_pixel p x y (r, g, b) =    
-  let set =
-    match p.depth with
-    | 1 -> Bytes.set_uint8
-    | 2 -> Bytes.set_uint16_be
-    | _ -> raise @@ Invalid_argument "bad depth"
-  in    
-  let pixel = (p.width * y) + x in    
-  let set_channel c v = set p.buffer (pixel + c) v in
-  set_channel 0 r;
-  set_channel 1 g;
-  set_channel 2 b
+let set_pixel (p : t) x y (r, g, b) =  
+  let module P = (val p.format) in
+  let pixel = ((p.width * y) + x) * 3 in
+  let buf = P.of_bytes p.buffer in
+  P.(set buf (pixel + 0) r;
+     set buf (pixel + 1) g;
+     set buf (pixel + 2) b)
 
 let read =
   let is_whitespace = function
@@ -59,31 +54,28 @@ let read =
           loop (input_char chan)
       in loop c
   in 
-  fun chan ->
+  fun (chan : in_channel) ->
     match really_input_string chan 2 with
     | "P6" ->
       let width = read_header_int chan in
       let height = read_header_int chan in
       let max_val = read_header_int chan in
-      let color_bytes =
+      let format : (module Bytes_view.S) =
         match max_val with
-        | v when v < 0 -> failwith "invalid color space: negative"
-        | v when v = 0 -> failwith "invalid color space: empty"
-        | v when v < 256 -> 1
-        | v when v < 65536 -> 2
-        | _ -> failwith "invalid color space: too large"
+        | v when v < 0 -> invalid_arg "invalid ppm: maximum color value negative"
+        | v when v = 0 -> invalid_arg "invalid ppm: maximum color value is 0"
+        | v when v < 256 -> (module Bytes_view.U8)
+        | v when v < 65536 -> (module Bytes_view.U16_be)
+        | _ -> invalid_arg "invalid ppm: maximum color value too large"
       in
-      let buffer_size = color_bytes * 3 * width * height in
-      let bytes_in = Bytes.create buffer_size in
-      really_input chan bytes_in 0 buffer_size;
-      { width; height; depth = color_bytes; buffer = bytes_in }
-    | _ -> failwith "invalid ppm file: missing magic number"
+      let module Buf = (val format) in
+      let size = width * height * Buf.elt_size * 3 in
+      let buffer = Bytes.create size in
+      really_input chan buffer 0 size;
+      { width; height; max_val; format; buffer }
+    | _ -> invalid_arg "invalid ppm: missing magic number"
 
 let print p chan =
-  Printf.fprintf chan "P6\n%d\n%d\n%d\n" p.width p.height p.depth;
-  for y = 0 to p.height - 1 do
-    for x = 0 to p.width - 1 do
-      let (r, g, b) = get_pixel p x y in
-      Printf.fprintf chan "%d%d%d" r g b
-    done
-  done
+  let module Pixbuf = (val p.format) in
+  Printf.fprintf chan "P6\n%d %d\n%d\n" p.width p.height p.max_val;
+  output_bytes chan p.buffer
