@@ -8,6 +8,20 @@ type t = {
   buffer : Bytes.t
 }
 
+let get_format : int -> (module Bytes_view.S) = function
+  | v when v < 0 -> invalid_arg "invalid ppm: maximum color value negative"
+  | v when v = 0 -> invalid_arg "invalid ppm: maximum color value is 0"
+  | v when v < 256 -> (module Bytes_view.U8)
+  | v when v < 65536 -> (module Bytes_view.U16_be)
+  | _ -> invalid_arg "invalid ppm: maximum color value too large"
+
+let create width height max_val =
+  let format = get_format max_val in  
+  let module Buf = (val format) in
+  let size = width * height * Buf.elt_size * 3 in
+  let buffer = Bytes.create size in  
+  { width; height; max_val; format; buffer }
+  
 let copy p = { p with buffer = Bytes.copy p.buffer }
 let width p = p.width
 let height p = p.height                   
@@ -60,19 +74,9 @@ let read =
       let width = read_header_int chan in
       let height = read_header_int chan in
       let max_val = read_header_int chan in
-      let format : (module Bytes_view.S) =
-        match max_val with
-        | v when v < 0 -> invalid_arg "invalid ppm: maximum color value negative"
-        | v when v = 0 -> invalid_arg "invalid ppm: maximum color value is 0"
-        | v when v < 256 -> (module Bytes_view.U8)
-        | v when v < 65536 -> (module Bytes_view.U16_be)
-        | _ -> invalid_arg "invalid ppm: maximum color value too large"
-      in
-      let module Buf = (val format) in
-      let size = width * height * Buf.elt_size * 3 in
-      let buffer = Bytes.create size in
-      really_input chan buffer 0 size;
-      { width; height; max_val; format; buffer }
+      let pixbuf = create width height max_val in
+      really_input chan pixbuf.buffer 0 (Bytes.length pixbuf.buffer);
+      pixbuf
     | _ -> invalid_arg "invalid ppm: missing magic number"
 
 let print p chan =
