@@ -35,20 +35,18 @@ let test_union (module M : Amt.S with type key = int) rand_range =
   let b = make rand_range in
 
   let open Format in
-  let print k =
-    printf "%d = %a;@ " k @@ fun ppf ->
+  let pp_int_list ppf =
     fprintf ppf "[%a]" @@
     pp_print_list
       ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
       pp_print_int
   in
-  printf "\nA\n-----\n";
-  M.iter print a;
-  printf "\n\nB\n-----\n";
-  M.iter print b;
-  printf "\n\nA + B\n-----\n";
-  M.iter print @@ M.union (fun _ a b -> Some (List.append a b)) a b;
-  print_newline ()
+  let pp_map = M.pp_print pp_print_int pp_int_list in
+  print_newline ();
+  printf "A\n-----\n%a\n\n" pp_map a;
+  printf "B\n-----\n%a\n\n" pp_map b;
+  printf "A + B\n-----\n%a\n" pp_map @@
+  M.union (fun _ a b -> Some (List.append a b)) a b
   
 module AMT = Amt.AMT
 let () = random_inserts (module AMT) 40000

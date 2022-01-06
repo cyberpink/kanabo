@@ -26,6 +26,11 @@ sig
   val intersection : (key -> 'a -> 'b -> 'c option) -> 'a t -> 'b t -> 'c t
   val union : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val min_binding_opt : 'a t -> (key * 'a) option
+  val pp_print :
+    ?pp_sep:(Format.formatter -> unit -> unit) ->
+    ?pp_link:(Format.formatter -> unit -> unit) ->
+    (Format.formatter -> key -> unit) ->
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 end
 
 module AMT : (S with type key = int) = struct
@@ -115,4 +120,16 @@ module AMT : (S with type key = int) = struct
         Option.bind (SVec.min m.branches) @@
         fun (k, b) -> aux (Key.push key k) b
     in aux Key.empty m
+
+  let pp_print =
+    let open Format in
+    let default_sep = fun ppf () -> fprintf ppf ";@ " in
+    let default_link = fun ppf () -> fprintf ppf "@ =@ " in
+    fun ?(pp_sep = default_sep) ?(pp_link = default_link) pp_key pp_val ppf ->
+      fprintf ppf "{@ %a@ }" @@ fun ppf ->
+      iter @@ fun k v ->
+      pp_key ppf k;
+      pp_link ppf ();
+      pp_val ppf v;
+      pp_sep ppf ()
 end
