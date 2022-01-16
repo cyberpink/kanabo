@@ -1,3 +1,6 @@
+(* Runtime type representations based on Oleg Kiselyov's writings
+   (https://okmij.org/ftp/ML/canonical.html#trep)
+*)
 type _ trep = ..
 type (_, _) eq = Refl : ('a, 'a) eq
 
@@ -8,6 +11,7 @@ type _ trep +=
   | String : string trep
   | Option : 'a trep -> 'a option trep
   | List   : 'a trep -> 'a list trep
+  | Array  : 'a trep -> 'a array trep
   | Pair   : 'a trep * 'b trep -> ('a * 'b) trep
   | Fun    : 'a trep * 'b trep -> ('a -> 'b) trep
 
