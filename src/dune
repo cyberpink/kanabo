@@ -1,7 +1,7 @@
 (library
   (name kanabo)
   (public_name kanabo)
-  (modules amt array SVec mergeable bits ratio monoid
+  (modules amt array SVec mergeable bits ratio monoid optional
            group ring field coercible math store HK trep
            generic bytes_view ppm sparse_map)
   (foreign_stubs (language c) (names stub)))
