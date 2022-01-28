@@ -3,5 +3,5 @@
   (public_name kanabo)
   (modules amt array SVec mergeable bits ratio monoid optional
            group ring field coercible math store HK trep
-           generic bytes_view ppm sparse_map)
+           generic bytes_view ppm sparse_map dyn pmap)
   (foreign_stubs (language c) (names stub)))
