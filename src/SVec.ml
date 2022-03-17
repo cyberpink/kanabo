@@ -1,4 +1,8 @@
-(* Sparse Vectors using bitmaps *)
+(* Sparse Vectors using bitmaps 
+   Maximum size of 31 or 63 depending on arch
+   
+   TODO: parameterize storage incase bytevector wanted
+*)
 type key = int
 type 'a t = { bitmap : int; storage : 'a array }
 let empty = { bitmap = 0; storage = Array.empty }
@@ -57,15 +61,16 @@ let min v =
 
 let merge map_a map_b merge_ab a b =
   let buff = empty_buff () in
-  Bits.iteri
-    (fun i _ ->
-       match (find_opt a i, find_opt b i) with
-       | None, None -> ()
-       | Some a, None -> push_buff buff i (map_a i a)
-       | None, Some b -> push_buff buff i (map_b i b)
-       | (Some a, Some b) -> push_buff buff i (merge_ab i a b))
-    (a.bitmap lor b.bitmap);
+  Bits.iter2
+    (fun i a_slot -> push_buff buff i (map_a i (Array.unsafe_get a.storage a_slot)))    
+    (fun i b_slot -> push_buff buff i (map_b i (Array.unsafe_get b.storage b_slot)))
+    (fun i a_slot b_slot ->
+       let av = Array.unsafe_get a.storage a_slot in
+       let bv = Array.unsafe_get b.storage b_slot in
+       push_buff buff i (merge_ab i av bv))
+    a.bitmap b.bitmap;
   reify_buff buff
+
 
 include Mergeable.MergeSet(struct
     type key = int
