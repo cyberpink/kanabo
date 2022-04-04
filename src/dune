@@ -1,8 +1,9 @@
 (library
   (name kanabo)
   (public_name kanabo)
+  (ocamlopt_flags (:standard -O3))
   (modules amt array SVec mergeable bits ratio monoid optional
            group ring field coercible math store HK trep
-           generic bytes_view ppm sparse_map dyn pmap
+           generic bytes_view ppm dyn pmap map
            small_byte_vec small_string multiset int trie)
-  (foreign_stubs (language c) (names stub)))
+  (foreign_stubs (language c) (names stub) (flags -O3 -mpopcnt -mbmi -mbmi2 -mlzcnt)))

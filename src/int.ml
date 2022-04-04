@@ -3,6 +3,7 @@ type scalar = t
 let scale = mul
 
 module Sum = struct
+  type nonrec t = t
   let empty = 0
   let join = add
   let to_opt i = match i with 0 -> None | i -> Some i

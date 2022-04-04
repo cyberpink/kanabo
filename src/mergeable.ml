@@ -1,7 +1,7 @@
 module type S = sig
   type key
   type 'a t
-  val merge :
+  val merge' :
     (key -> 'a -> 'c option) ->
     (key -> 'b -> 'c option) ->
     (key -> 'a -> 'b -> 'c option) ->
@@ -12,10 +12,16 @@ let keep _key x = Some x
 let drop _key _ = None
 let drop2 _key _ _ = None
 
+let none_some fn key x = fn key None (Some x)
+let some_none fn key x = fn key (Some x) None
+let some_some fn key x y = fn key (Some x) (Some y)
+
 module MergeSet (S : S) = struct
-  let symettric_difference a b = S.merge keep keep drop2 a b
-  let intersection fn a b = S.merge drop drop fn a b
-  let union fn a b = S.merge keep keep fn a b
+  let merge fn a b = S.merge' (some_none fn) (none_some fn) (some_some fn) a b
+  let symettric_difference a b = S.merge' keep keep drop2 a b
+  let intersection fn a b = S.merge' drop drop fn a b
+  let union fn a b = S.merge' keep keep fn a b
+  let subtract a b = S.merge' keep drop drop2 a b
 end
 
 

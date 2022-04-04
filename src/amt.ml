@@ -11,6 +11,7 @@ sig
   val find_opt : key -> 'a t -> 'a option
   val update : key -> ('a option -> 'a option) -> 'a t -> 'a t
   val map : ('a -> 'b) -> 'a t -> 'b t
+  val filter : (key -> 'a -> bool) -> 'a t -> 'a t
   val filter_map : (key -> 'a -> 'b option) -> 'a t -> 'b t
   val iter_values : ('a -> unit) -> 'a t -> unit
   val iter : (key -> 'a -> unit) -> 'a t -> unit
@@ -18,7 +19,7 @@ sig
   val mapi : (key -> 'a -> 'b) -> 'a t -> 'b t
   val add : key -> 'a -> 'a t -> 'a t
   val remove : key -> 'a t -> 'a t
-  val merge :
+  val merge' :
     (key -> 'a -> 'b option) ->
     (key -> 'c -> 'b option) ->
     (key -> 'a -> 'c -> 'b option) -> 'a t -> 'c t -> 'b t
@@ -33,6 +34,12 @@ sig
     (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 end
 
+(* branch and leaf vectors can be totally separate
+   can use different key modules as well
+
+   example would be using amt as a bitmap
+   the leave nodes should just be a bitmap rather than a bitmapped vector
+*)
 module AMT : (S with type key = int) = struct
   module Key = struct
     type t = int
@@ -54,37 +61,44 @@ module AMT : (S with type key = int) = struct
 
   let rec find_opt key node =
     match Key.split key with
-    | Unit idx -> SVec.find_opt node.leaves idx
-    | Pair (idx, key') -> Option.bind (SVec.find_opt node.branches idx) (find_opt key')
+    | Unit idx -> SVec.find_opt idx node.leaves
+    | Pair (idx, key') -> Option.bind (SVec.find_opt idx node.branches) (find_opt key')
 
   let rec update key fn node =
     match Key.split key with
-    | Unit idx -> { node with leaves = SVec.update node.leaves idx fn }
+    | Unit idx -> { node with leaves = SVec.update idx fn node.leaves }
     | Pair (idx, key') ->
       let branches' =
-        SVec.update node.branches idx @@
+        node.branches |> SVec.update idx @@
         fun c -> Some (update key' fn @@ from_opt c)
       in { node with branches = branches' }
 
   let rec map fn node =
     { leaves = SVec.map fn node.leaves;
       branches = SVec.map (map fn) node.branches }
-    
+
+  let filter fn node =
+    let rec aux node =
+      let leaves = SVec.filter fn node.leaves in
+      let branches = SVec.filter_map (fun _ -> aux) node.branches in
+      to_opt { leaves; branches }
+    in from_opt @@ aux node
+
   let filter_map fn node =
     let rec aux key node =
-      let leaves = SVec.filter_mapi (fun lkey -> fn @@ Key.view @@ Key.push key lkey) node.leaves in
-      let branches = SVec.filter_mapi (fun bkey -> aux @@ Key.push key bkey) node.branches in
+      let leaves = SVec.filter_map (fun lkey -> fn @@ Key.view @@ Key.push key lkey) node.leaves in
+      let branches = SVec.filter_map (fun bkey -> aux @@ Key.push key bkey) node.branches in
       to_opt { leaves; branches }
     in from_opt @@ aux Key.empty node
 
   let rec iter_values fn node =
-    SVec.iter fn node.leaves;
-    SVec.iter (iter_values fn) node.branches
+    SVec.iter_values fn node.leaves;
+    SVec.iter_values (iter_values fn) node.branches
 
   let iter fn node =
     let rec aux key node =
-      SVec.iteri (fun lkey -> fn @@ Key.view @@ Key.push key lkey) node.leaves;
-      SVec.iteri (fun bkey -> aux @@ Key.push key bkey) node.branches
+      SVec.iter (fun lkey -> fn @@ Key.view @@ Key.push key lkey) node.leaves;
+      SVec.iter (fun bkey -> aux @@ Key.push key bkey) node.branches
     in aux Key.empty node
 
   let fold fn node init =
@@ -97,27 +111,27 @@ module AMT : (S with type key = int) = struct
   let add key value node = update key (fun _ -> Some value) node
   let remove key node = update key (fun _ -> None) node
 
-  let merge map_a map_b merge_ab a b =
+  let merge' map_a map_b merge_ab a b =
     let map_a' _key x = Some (filter_map map_a x) in
     let map_b' _key x = Some (filter_map map_b x) in
     let rec merge_ab' _key a b =
       to_opt @@
-      { leaves = SVec.merge map_a map_b merge_ab a.leaves b.leaves;
-        branches = SVec.merge map_a' map_b' merge_ab' a.branches b.branches }
+      { leaves = SVec.merge' map_a map_b merge_ab a.leaves b.leaves;
+        branches = SVec.merge' map_a' map_b' merge_ab' a.branches b.branches }
     in from_opt @@ merge_ab' 0 a b
 
   include Mergeable.MergeSet(struct
       type key = Key.t
       type nonrec 'a t = 'a t
-      let merge = merge
+      let merge' = merge'
     end)
 
   let min_binding_opt m =
     let rec aux key m =
-      match SVec.min m.leaves with
+      match SVec.min_opt m.leaves with
       | Some (k, x) -> Some (Key.view @@ Key.push key k, x)
       | None ->
-        Option.bind (SVec.min m.branches) @@
+        Option.bind (SVec.min_opt m.branches) @@
         fun (k, b) -> aux (Key.push key k) b
     in aux Key.empty m
 
